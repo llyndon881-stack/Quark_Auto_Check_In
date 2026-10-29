@@ -63,10 +63,25 @@ jobs:
         run: python -m pip install --disable-pip-version-check -r requirements.txt
 
       - name: 执行签到脚本
+        id: signin
         if: steps.cache-success.outputs.cache-hit != 'true'
+        shell: bash
         env:
           COOKIE_QUARK: ${{ secrets.COOKIE_QUARK }}
-        run: python checkIn_Quark.py
+        run: |
+          set -o pipefail
+          python checkIn_Quark.py 2>&1 | tee sign.log
+
+      - name: WxPusher 推送签到结果
+        if: always() && steps.cache-success.outputs.cache-hit != 'true'
+        continue-on-error: true
+        env:
+          WXPUSHER_SPT: ${{ secrets.WXPUSHER_SPT }}
+          WXPUSHER_APP_TOKEN: ${{ secrets.WXPUSHER_APP_TOKEN }}
+          WXPUSHER_UIDS: ${{ secrets.WXPUSHER_UIDS }}
+          WXPUSHER_TOPIC_IDS: ${{ secrets.WXPUSHER_TOPIC_IDS }}
+          SIGN_OUTCOME: ${{ steps.signin.outcome }}
+        run: python notify.py
 
       - name: 生成今日成功标记
         if: success() && steps.cache-success.outputs.cache-hit != 'true'
